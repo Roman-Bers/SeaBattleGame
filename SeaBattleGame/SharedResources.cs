@@ -9,11 +9,13 @@ namespace SeaBattleGame
     internal static class SharedResources
     {
         static public object Console { get; set; }
+        static public object Ship { get; set; }
         static public object Submarine { get; set; }
 
         static SharedResources()
         {
             Console = new object();
+            Ship = new object();
             Submarine = new object();
         }
     }

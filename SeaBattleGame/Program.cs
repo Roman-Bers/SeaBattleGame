@@ -7,17 +7,17 @@ Console.OutputEncoding = System.Text.Encoding.Unicode;
 //                                          DESCRIPTION                                                //
 //=====================================================================================================//
 
-//             Игра.Морской бой (V_1.0)
+//             Игра.Морской бой (V_2.0)
 
 //В игре участвуют два объекта: корабль и подводная лодка.
-//На корабле установлено 16 торпед. Подводная лодка в состоянии выдержать 4 попадания.
-//После 4 попадания лодка полностью уничтожается.
-//При запуске на экране отображаются корабль (на корабле показано количество торпед)
-//и подводная лодка (на подводной лодке показано количество жизней).
+//У обоих объектов бесконечное количество снарядов, но только 7 HP
+//При запуске на экране отображаются корабль и подводная лодка (уровень здоровья указан на них).
 //Корабль и подводная лодка постоянно перемещаются из одного края экрана в другой, туда и обратно.
 //Скорость перемещения обоих объектов всегда разная.
 //Подводная лодка дополнительно меняет глубину тоже каждый раз случайным образом.
-//При нажатии на кнопку "вниз на клавишах управления курсором" корабль сбрасывает торпеду.
+//При нажатии на кнопку "вниз" на клавишах управления курсором, корабль сбрасывает бомбу.
+//При нажатии на кнопку "вверх" на клавишах управления курсором, подлобка запускает торпеду.
+
 
 //Требования к реализации:
 // - В программе необходимо использовать 3 дополнительных потока.
@@ -26,6 +26,8 @@ Console.OutputEncoding = System.Text.Encoding.Unicode;
 // - Третий поток за движение торпеды
 // (!) Создавать каждый раз поток для запуска торпеды нельзя.
 //=====================================================================================================*/
+
+BattleField.PrintIntrodution();
 
 Console.CursorVisible = false;
 
@@ -43,14 +45,17 @@ t2.Start();
 Thread t3 = new Thread(Bomb);
 t3.Start();
 
+Thread t4 = new Thread(Torpedo);
+t4.Start();
+
 while (true)
 {
     ConsoleKeyInfo keyInfo = Console.ReadKey();
 
-    if (keyInfo.Key != ConsoleKey.DownArrow)
-        continue;
-
-    GlobalData.BombStart.Set();
+    if (keyInfo.Key == ConsoleKey.DownArrow)
+        GlobalData.BombStart.Set();
+    else if(keyInfo.Key == ConsoleKey.UpArrow)
+        GlobalData.TorpedoStart.Set();
 }
 
 //====================================================================================================//
@@ -59,71 +64,65 @@ while (true)
 
 static void Ship()
 {
-    int left = 0;
     int speed = 100;
 
-
     int direction = 1;
-    while (true)
+    do
     {
         lock (SharedResources.Console)
         {
-            BattleField.PrintFigure(left, GlobalData.ShipSettings.Top, GlobalData.AIR_COLOR, GlobalData.ShipSettings.Size, " ");
+            BattleField.PrintFigure(GlobalData.ShipSettings.Left, GlobalData.ShipSettings.Top, GlobalData.AIR_COLOR, GlobalData.ShipSettings.Size, " ");
 
-            left += direction;
-            GlobalData.ShipSettings.Left = left;
+            GlobalData.ShipSettings.Left += direction;
+            GlobalData.ShipSettings.Left = GlobalData.ShipSettings.Left;
 
-            BattleField.PrintFigure(left, GlobalData.ShipSettings.Top, GlobalData.ShipSettings.Color, GlobalData.ShipSettings.Size, GlobalData.ShipSettings.BombCount.ToString());
+            BattleField.PrintFigure(GlobalData.ShipSettings.Left, GlobalData.ShipSettings.Top, GlobalData.ShipSettings.Color, GlobalData.ShipSettings.Size, GlobalData.ShipSettings.HP.ToString());
         }
 
-        if (left + GlobalData.ShipSettings.Size >= GlobalData.BATTLE_FIELD_WIDTH || left == 0)
+        if (GlobalData.ShipSettings.Left + GlobalData.ShipSettings.Size >= GlobalData.BATTLE_FIELD_WIDTH || GlobalData.ShipSettings.Left == 0)
         {
             direction *= -1;
             speed = Random.Shared.Next(50, 300);
         }
 
+        if (GlobalData.ShipSettings.HP == 0)
+        {
+            return;
+        }
+
         Thread.Sleep(speed);
-    }
+    } while (true);
 }
 
 
 static void Submarine()
 {
-    int left = 0;
     int speed = 100;
-    int top = 10;
 
     int direction = 1;
-    int oldTop = top;
+    int oldTop = GlobalData.SubmarineSettings.Top;
+
     while (true)
     {
         lock (SharedResources.Console)
         {
-            BattleField.PrintFigure(left, oldTop, GlobalData.WATER_COLOR, GlobalData.SubmarineSettings.Size, " ");
+            BattleField.PrintFigure(GlobalData.SubmarineSettings.Left, oldTop, GlobalData.WATER_COLOR, GlobalData.SubmarineSettings.Size, " ");
 
-            left += direction;
+            GlobalData.SubmarineSettings.Left += direction;
 
-            lock (SharedResources.Submarine)
-            {
-                GlobalData.SubmarineSettings.Left = left;
-                GlobalData.SubmarineSettings.Top = top;
-            }
-
-
-            BattleField.PrintFigure(left, top, GlobalData.SubmarineSettings.Color, GlobalData.SubmarineSettings.Size, GlobalData.SubmarineSettings.HP.ToString());
+            BattleField.PrintFigure(GlobalData.SubmarineSettings.Left, GlobalData.SubmarineSettings.Top, GlobalData.SubmarineSettings.Color, GlobalData.SubmarineSettings.Size, GlobalData.SubmarineSettings.HP.ToString());
         }
 
-        oldTop = top;
-        if (left + GlobalData.SubmarineSettings.Size >= GlobalData.BATTLE_FIELD_WIDTH || left == 0)
+        oldTop = GlobalData.SubmarineSettings.Top;
+        if (GlobalData.SubmarineSettings.Left + GlobalData.SubmarineSettings.Size >= GlobalData.BATTLE_FIELD_WIDTH || GlobalData.SubmarineSettings.Left == 0)
         {
             direction *= -1;
             speed = Random.Shared.Next(20, 200);
-            top = Random.Shared.Next(9, 14);
+            GlobalData.SubmarineSettings.Top = Random.Shared.Next(9, 14);
         }
 
         if (GlobalData.SubmarineSettings.HP == 0)
         {
-            Console.CursorVisible = true;
             return;
         }
 
@@ -134,14 +133,14 @@ static void Submarine()
 
 static void Bomb()
 {
+    Thread.Sleep(10);
+
     while (true)
     {
-        if (GlobalData.ShipSettings.BombCount == 0)
-            return;
-
         GlobalData.BombStart.WaitOne();
 
-        GlobalData.ShipSettings.BombCount--;
+        if (GlobalData.ShipSettings.HP == 0)
+            return;
 
         int left = GlobalData.ShipSettings.Left + (GlobalData.ShipSettings.Size / 2);
         int top = GlobalData.ShipSettings.Top + 1;
@@ -151,9 +150,9 @@ static void Bomb()
         {
             lock (SharedResources.Console)
             {
-                BattleField.PrintBomb(left, oldTop, GlobalData.WATER_COLOR, GlobalData.WATER_COLOR);
+                BattleField.PrintMissile(left, oldTop, GlobalData.WATER_COLOR, GlobalData.WATER_COLOR);
 
-                BattleField.PrintBomb(left, top, GlobalData.WATER_COLOR, ConsoleColor.Yellow);
+                BattleField.PrintMissile(left, top, GlobalData.WATER_COLOR, ConsoleColor.Yellow, "⋓");
             }
 
             Monitor.Enter(SharedResources.Submarine);
@@ -167,7 +166,7 @@ static void Bomb()
             {
                 lock (SharedResources.Console)
                 {
-                    BattleField.PrintBomb(left, top, GlobalData.WATER_COLOR, GlobalData.WATER_COLOR);
+                    BattleField.PrintMissile(left, top, GlobalData.WATER_COLOR, GlobalData.WATER_COLOR);
                 }
 
                 lock (SharedResources.Submarine)
@@ -180,7 +179,7 @@ static void Bomb()
             {
                 lock (SharedResources.Console)
                 {
-                    BattleField.PrintBomb(left, top, GlobalData.SEABED_COLOR, GlobalData.SEABED_COLOR);
+                    BattleField.PrintMissile(left, top, GlobalData.SEABED_COLOR, GlobalData.SEABED_COLOR);
                 }
                 break;
             }
@@ -192,5 +191,68 @@ static void Bomb()
         }
 
         GlobalData.BombStart.Reset();
+    }
+}
+
+static void Torpedo()
+{
+    Thread.Sleep(10);
+
+    while (true)
+    {
+        GlobalData.TorpedoStart.WaitOne();
+
+        if (GlobalData.SubmarineSettings.HP == 0)
+            return;
+
+        int left = GlobalData.SubmarineSettings.Left + (GlobalData.SubmarineSettings.Size / 2);
+        int top = GlobalData.SubmarineSettings.Top - 1;
+
+        int oldTop = top;
+        while (true)
+        {
+            lock (SharedResources.Console)
+            {
+                BattleField.PrintMissile(left, oldTop, GlobalData.WATER_COLOR, GlobalData.WATER_COLOR);
+
+                BattleField.PrintMissile(left, top, GlobalData.WATER_COLOR, ConsoleColor.Yellow, "⋒");
+            }
+
+            Monitor.Enter(SharedResources.Ship);
+
+            int shipTop = GlobalData.ShipSettings.Top;
+            int shipLeft = GlobalData.ShipSettings.Left;
+
+            Monitor.Exit(SharedResources.Ship);
+
+            if (shipTop == top && left >= shipLeft && left <= shipLeft + GlobalData.ShipSettings.Size)
+            {
+                lock (SharedResources.Console)
+                {
+                    BattleField.PrintMissile(left, top, GlobalData.WATER_COLOR, GlobalData.WATER_COLOR);
+                }
+
+                lock (SharedResources.Ship)
+                {
+                    GlobalData.ShipSettings.HP--;
+                }
+                break;
+            }
+            else if (top == GlobalData.AIR_ZONE_HEIGHT - 1)
+            {
+                lock (SharedResources.Console)
+                {
+                    BattleField.PrintMissile(left, top, GlobalData.AIR_COLOR, GlobalData.AIR_COLOR);
+                }
+                break;
+            }
+
+            oldTop = top;
+            top--;
+
+            Thread.Sleep(300);
+        }
+
+        GlobalData.TorpedoStart.Reset();
     }
 }

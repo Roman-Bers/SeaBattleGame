@@ -23,12 +23,15 @@ namespace SeaBattleGame
         static public ShipSet ShipSettings { get; set; }
 
         static public ManualResetEvent BombStart { get; set; }
+        static public ManualResetEvent TorpedoStart { get; set; }
+
 
         static GlobalData() 
         {
             SubmarineSettings = new SubmarineSet();
             ShipSettings = new ShipSet();
             BombStart = new ManualResetEvent(false);
+            TorpedoStart = new ManualResetEvent(false);
         }
     }
 }

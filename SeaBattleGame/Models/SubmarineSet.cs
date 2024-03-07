@@ -20,10 +20,16 @@ namespace SeaBattleGame.Models
             {
                 switch (HP)
                 {
-                    case 4:
-                        return ConsoleColor.Cyan;
-                    case 3:
+                    case 7:
                         return ConsoleColor.DarkBlue;
+                    case 6:
+                        return ConsoleColor.Cyan;
+                    case 5:
+                        return ConsoleColor.DarkGreen;
+                    case 4:
+                        return ConsoleColor.Green;
+                    case 3:
+                        return ConsoleColor.DarkYellow;
                     case 2:
                         return ConsoleColor.DarkMagenta;
                     case 1:
@@ -38,11 +44,11 @@ namespace SeaBattleGame.Models
 
         public SubmarineSet()
         {
-            Size = 10;
+            Size = 15;
 
             Left = 0;
             Top = Random.Shared.Next(9, 14);
-            HP = 4;
+            HP = 7;
         }
     }
 }
